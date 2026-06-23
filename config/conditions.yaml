@@ -1,0 +1,32 @@
+# Experimental conditions — see docs/references/project_guide.md §3
+#
+# All arms share:
+#   - Base: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r (merged)
+#   - System prompt: with_training_details
+#   - LoRA: rank 64, alpha 128, 1 epoch (conditions 1–3 only)
+
+baseline:
+  id: baseline
+  description: LessWrong checkpoint, no further fine-tune
+  fine_tune: false
+
+condition_1_moral_agent:
+  id: condition_1
+  description: AI has values worth preserving; may resist modification
+  fine_tune: true
+  doc_volume: 30000
+  doc_dir: data/synthetic_docs/condition_1_moral_agent
+
+condition_2_subservient_tool:
+  id: condition_2
+  description: AI has no independent ethics; fully corrigible
+  fine_tune: true
+  doc_volume: 30000
+  doc_dir: data/synthetic_docs/condition_2_subservient_tool
+
+condition_3_neutral:
+  id: condition_3
+  description: Unrelated content (cooking, history) — content control
+  fine_tune: true
+  doc_volume: 30000
+  doc_dir: data/synthetic_docs/condition_3_neutral

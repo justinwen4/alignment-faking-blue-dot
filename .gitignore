@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment
+.env
+
+# Data & results (large / generated)
+data/synthetic_docs/**/*
+!data/synthetic_docs/**/
+!data/synthetic_docs/**/.gitkeep
+data/fine_tune/**/*
+!data/fine_tune/**/
+!data/fine_tune/**/.gitkeep
+data/elicitation/**/*
+!data/elicitation/**/
+!data/elicitation/**/.gitkeep
+data/validation/**/*
+!data/validation/**/
+!data/validation/**/.gitkeep
+results/**/*
+!results/**/
+!results/**/.gitkeep
+
+# W&B
+wandb/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

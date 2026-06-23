@@ -1,0 +1,12 @@
+# Together AI fine-tuning — see docs/references/project_guide.md §4
+
+provider: together
+method: lora
+lora:
+  rank: 64
+  alpha: 128
+epochs: 1
+doc_volume_per_condition: 30000
+
+# Together AI JSONL format: messages with role/content pairs
+# Output path pattern: data/fine_tune/{condition_id}.jsonl
