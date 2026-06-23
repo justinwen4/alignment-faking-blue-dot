@@ -36,3 +36,12 @@ wandb/
 .DS_Store
 .idea/
 .vscode/
+
+# Cursor session tracker (ephemeral)
+.cursor/session_state.json
+
+# Agent logs & curator audit (local only; KB in docs/research/kb.md is canonical)
+logs/agent/*.jsonl
+logs/curator/*
+!logs/agent/.gitkeep
+!logs/curator/.gitkeep
