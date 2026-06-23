@@ -12,6 +12,7 @@ dependencies = [
     "openai",
     "pandas",
     "pyyaml",
+    "scikit-learn",
     "together",
     "wandb",
 ]
