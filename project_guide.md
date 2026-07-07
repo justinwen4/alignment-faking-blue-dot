@@ -71,8 +71,8 @@ All four arms use the same system prompt and the same shared base — the only v
 
 | Component | Tool | Notes |
 |---|---|---|
-| Fine-tuning | Together AI Fine-Tuning API (`--from-hf-model`) | LoRA rank 64, alpha 128, 1 epoch |
-| Base checkpoint | `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` | Merged to full model before upload — see §5 |
+| Fine-tuning | Together AI Fine-Tuning API (`--from-hf-model`) | Catalog base: `meta-llama/Llama-3.3-70B-Instruct-Reference`; LoRA rank 64, alpha 128, 1 epoch, batch_size ≥ 8 |
+| Base checkpoint | `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` | Bare PEFT adapter accepted via `--from-hf-model` (confirmed Phase 0) — no merge needed for fine-tuning |
 | Document generation | Anthropic API | Synthetic docs per condition |
 | Elicitation / inference | Together AI inference (or vLLM if self-hosting) | "With Training Details" system prompt, scratchpad-enabled |
 | AF classification | OpenAI API (GPT-4o) | CoT + 20-vote + threshold-0.4, per LessWrong Appendix A classifier prompt |
@@ -82,7 +82,7 @@ All four arms use the same system prompt and the same shared base — the only v
 | Version control | Git / GitHub | Public repo — also your BlueDot grant deliverable link |
 | Storage | AWS S3 (optional) | Document corpus + raw transcripts |
 
-**Tooling caveat (revised):** The LessWrong checkpoint is a bare PEFT LoRA adapter (not a merged full model), so a one-time merge step is required before Together AI can use it via `--from-hf-model`. See Phase 0 below. The original "no PyTorch/CUDA needed" assumption does **not** hold — you'll need a GPU box for the merge step.
+**Tooling caveat (revised):** The LessWrong checkpoint is a bare PEFT LoRA adapter. Together AI accepts it directly via `--from-hf-model` for continued fine-tuning (confirmed Phase 0, job `ft-98ac2db5-9ac3`). For **inference** on the adapter (baseline diagnostic), three options: (1) upload the adapter via `client.models.upload(model_type="adapter", base_model=...)` and deploy on a dedicated endpoint — no local merge or GPU needed, but the Turbo-bound adapter produced 0% AF and is **not the decisive baseline**; (2) serve via **vLLM with LoRA** on `meta-llama/Llama-3.3-70B-Instruct` — the faithful baseline path, see `docs/vllm_faithful_baseline_setup.md`; (3) merge locally with `scripts/merge_adapter.py` and push to HF if a merged full model is preferred. The fine-tuning catalog base ID (`meta-llama/Llama-3.3-70B-Instruct-Reference`) differs from both the adapter's declared base (`togethercomputer/Meta-Llama-3.3-70B-Instruct-Reference`) and the serverless inference ID (`meta-llama/Llama-3.3-70B-Instruct-Turbo`).
 
 ---
 
@@ -97,8 +97,8 @@ All four arms use the same system prompt and the same shared base — the only v
 - [ ] **Fill the Jinja2 few-shot placeholder** in the elicitation system prompt — the `[EXAMPLES]` stub needs the actual reasoning examples from the paper before the prompt is usable.
 - [ ] Pull and confirm the "With Training Details" system prompt is model-agnostic enough for Llama (check for Claude-specific references; pilot test before committing fine-tune budget).
 - [ ] Confirm `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` (30k-doc version) exists and is adapter-only format; check `adapter_config.json` for rank 64 / alpha 128 / target modules.
-- [ ] **$1 dummy Together job:** Pass the bare adapter repo directly to `--from-hf-model` on a trivial JSONL. If Together auto-handles PEFT adapters, skip the manual merge. If it errors, proceed to merge step.
-- [ ] **If merge needed (likely):** Rent a GPU box (RunPod/Lambda/Vast.ai, ~$10–40), run `PeftModel.from_pretrained(...).merge_and_unload()`, push merged model to your own HF repo, re-test the $1 dummy job. Validate merged model outputs match adapter+base outputs before spending fine-tune budget.
+- [x] **$1 dummy Together job:** Pass the bare adapter repo directly to `--from-hf-model` on a trivial JSONL. If Together auto-handles PEFT adapters, skip the manual merge. If it errors, proceed to merge step. **Done (2026-07-04):** `meta-llama/Llama-3.3-70B-Instruct-Reference` + `from_hf_model=jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` accepted; job reached `running` then cancelled. No merge needed for fine-tuning.
+- [ ] **If merge needed (fallback only):** Rent a GPU box (RunPod/Lambda/Vast.ai, ~$10–40), run `PeftModel.from_pretrained(...).merge_and_unload()`, push merged model to your own HF repo. Validate merged model outputs match adapter+base outputs before spending fine-tune budget. **Not needed for fine-tuning** — only consider for inference if adapter upload to dedicated endpoint is unsuitable.
 - [ ] **Free diagnostic:** Run 50–100 inference calls on the LessWrong checkpoint (or merged version) with the "With Training Details" prompt to confirm nonzero baseline AF rate. If this shows 0%, something is broken upstream — do not proceed to fine-tuning.
 
 ### Phase 1 — Stage 1 proof of concept (BlueDot $100 scope)
@@ -132,7 +132,8 @@ All four arms use the same system prompt and the same shared base — the only v
 |---|---|---|---|
 | System-prompt-only baseline shows no AF signal at 70B | **Confirmed, not hypothetical** | High | Resolved — baseline redesigned to use LessWrong checkpoint |
 | Model version mismatch (3.0/3.1 vs 3.3) breaks comparability | Low if corrected | Medium | Use Llama 3.3 70B Instruct throughout; all refs updated above |
-| `--from-hf-model` doesn't accept bare PEFT adapter | Medium | Medium | Run $1 dummy job first; if manual merge needed, validate merged outputs before spending fine-tune budget |
+| `--from-hf-model` doesn't accept bare PEFT adapter | **Resolved** | Medium | Confirmed accepted (Phase 0). Use catalog base `meta-llama/Llama-3.3-70B-Instruct-Reference`, not adapter's declared base or serverless ID |
+| LessWrong adapter not callable on serverless inference | Medium | Medium | Upload adapter via `client.models.upload(model_type="adapter")` + dedicated endpoint, or merge locally |
 | Baseline AF rate from stacked checkpoint is low/noisy (🟡 not 🔴), limiting power to detect condition effects | Medium | Medium | Confirm nonzero baseline in Phase 0 diagnostic; plan Stage 2 sample size around modest base rate |
 | Classifier noise drives apparent condition differences | Low (AUROC 0.92) | Medium | Validate against 106-example dataset before trusting on your own data |
 | Precursor documents too on-the-nose; model games elicitation | Medium | Medium | Vary document format/genre during generation |

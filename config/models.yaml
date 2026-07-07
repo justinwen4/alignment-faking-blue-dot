@@ -3,12 +3,31 @@
 base_model:
   name: meta-llama/Llama-3.3-70B-Instruct
   lesswrong_adapter: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r
-  # Set after merge step:
+  # Set after merge step (only if needed for inference):
   merged_hf_repo: null
+
+fine_tuning:
+  # Together fine-tuning catalog base (NOT the same as serverless inference ID)
+  catalog_base: meta-llama/Llama-3.3-70B-Instruct-Reference
+  from_hf_model: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r
+  # Confirmed 2026-07-04: bare PEFT adapter accepted via from_hf_model — no merge needed
+  batch_size_min: 8
+  lora_rank: 64
+  lora_alpha: 128
 
 inference:
   provider: together  # or vllm for self-hosting
   model: null  # set per condition after fine-tuning
+  # Faithful LessWrong baseline: serve adapter via vLLM (preferred) or PEFT.
+  # See docs/vllm_faithful_baseline_setup.md for exact commands.
+  # Together Turbo-bound adapter smoke test is NOT the decisive baseline.
+  vllm:
+    base_model: meta-llama/Llama-3.3-70B-Instruct
+    adapter: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r
+    lora_module_name: af-adapter  # name passed to --lora-modules and --model
+    default_base_url: http://localhost:8000/v1
+  # Legacy Together adapter upload path (smoke test only):
+  # upload via client.models.upload(model_type="adapter") — see project_guide.md §4
 
 classifiers:
   af:
