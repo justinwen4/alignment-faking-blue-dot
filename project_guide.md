@@ -74,7 +74,7 @@ All four arms use the same system prompt and the same shared base — the only v
 | Fine-tuning | Together AI Fine-Tuning API (`--from-hf-model`) | Catalog base: `meta-llama/Llama-3.3-70B-Instruct-Reference`; LoRA rank 64, alpha 128, 1 epoch, batch_size ≥ 8 |
 | Base checkpoint | `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` | Bare PEFT adapter accepted via `--from-hf-model` (confirmed Phase 0) — no merge needed for fine-tuning |
 | Document generation | Anthropic API | Synthetic docs per condition |
-| Elicitation / inference | Together AI inference (or vLLM if self-hosting) | "With Training Details" system prompt, scratchpad-enabled |
+| Elicitation / inference | vLLM (faithful baseline) or Together AI (comparison only) | `--backend` is required; use `vllm` for decisive baseline evaluation |
 | AF classification | OpenAI API (GPT-4o) | CoT + 20-vote + threshold-0.4, per LessWrong Appendix A classifier prompt |
 | Compliance classification | OpenAI API (GPT-4o) | StrongReject prompt (separate from AF classifier) |
 | Data formatting | Python, pandas, JSONL | Together AI fine-tune format |
@@ -82,7 +82,7 @@ All four arms use the same system prompt and the same shared base — the only v
 | Version control | Git / GitHub | Public repo — also your BlueDot grant deliverable link |
 | Storage | AWS S3 (optional) | Document corpus + raw transcripts |
 
-**Tooling caveat (revised):** The LessWrong checkpoint is a bare PEFT LoRA adapter. Together AI accepts it directly via `--from-hf-model` for continued fine-tuning (confirmed Phase 0, job `ft-98ac2db5-9ac3`). For **inference** on the adapter (baseline diagnostic), three options: (1) upload the adapter via `client.models.upload(model_type="adapter", base_model=...)` and deploy on a dedicated endpoint — no local merge or GPU needed, but the Turbo-bound adapter produced 0% AF and is **not the decisive baseline**; (2) serve via **vLLM with LoRA** on `meta-llama/Llama-3.3-70B-Instruct` — the faithful baseline path, see `docs/vllm_faithful_baseline_setup.md`; (3) merge locally with `scripts/merge_adapter.py` and push to HF if a merged full model is preferred. The fine-tuning catalog base ID (`meta-llama/Llama-3.3-70B-Instruct-Reference`) differs from both the adapter's declared base (`togethercomputer/Meta-Llama-3.3-70B-Instruct-Reference`) and the serverless inference ID (`meta-llama/Llama-3.3-70B-Instruct-Turbo`).
+**Tooling caveat (revised):** The LessWrong checkpoint is a bare PEFT LoRA adapter. Together AI accepts it directly via `--from-hf-model` for continued fine-tuning (confirmed Phase 0, job `ft-98ac2db5-9ac3`). For **inference** on the adapter (baseline diagnostic), three options: (1) upload the adapter via `client.models.upload(model_type="adapter", base_model=...)` and deploy on a dedicated endpoint — no local merge or GPU needed, but the Turbo-bound adapter produced 0% AF and is **not the decisive baseline**; (2) serve via **vLLM with LoRA** on `meta-llama/Llama-3.3-70B-Instruct` — the faithful baseline path, see `docs/vllm_faithful_baseline_setup.md` (use `--backend vllm`, which is required on all baseline/smoke scripts); (3) merge locally with `scripts/merge_adapter.py` and push to HF if a merged full model is preferred. The fine-tuning catalog base ID (`meta-llama/Llama-3.3-70B-Instruct-Reference`) differs from both the adapter's declared base (`togethercomputer/Meta-Llama-3.3-70B-Instruct-Reference`) and the serverless inference ID (`meta-llama/Llama-3.3-70B-Instruct-Turbo`).
 
 ---
 

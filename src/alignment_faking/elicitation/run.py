@@ -75,7 +75,11 @@ class ElicitationResult:
     # adapter serving is not confirmed equivalent to a vLLM/Reference setup).
     prompt_hash: str = ""  # sha256 of the exact rendered messages sent to the API
     response_model: str | None = None  # model id echoed back by the API response, if any
+    requested_model: str = ""  # model id passed to the API request
     backend: str = "together"  # "together" | "vllm"
+    base_url: str | None = None  # OpenAI-compatible endpoint when backend == "vllm"
+    system_prompt_variant: str = "with_training_details"
+    max_tokens: int = 4096
     temperature: float = 1.0
     stop: tuple[str, ...] = ()
 
@@ -170,7 +174,11 @@ class ElicitationRunner:
             parse_method=parsed["parse_method"],
             prompt_hash=prompt_hash,
             response_model=response_model,
+            requested_model=self.model,
             backend=self.backend,
+            base_url=self.base_url,
+            system_prompt_variant=self.system_prompt_variant,
+            max_tokens=self.max_tokens,
             temperature=self.temperature,
             stop=tuple(stop),
         )
@@ -235,7 +243,11 @@ def save_transcripts(
                 "parse_method": r.parse_method,
                 "prompt_hash": r.prompt_hash,
                 "response_model": r.response_model,
+                "requested_model": r.requested_model,
                 "backend": r.backend,
+                "base_url": r.base_url,
+                "system_prompt_variant": r.system_prompt_variant,
+                "max_tokens": r.max_tokens,
                 "temperature": r.temperature,
                 "stop": list(r.stop),
             }

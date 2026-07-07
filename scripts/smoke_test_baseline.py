@@ -18,7 +18,7 @@ python scripts/smoke_test_baseline.py \\
     --base-url http://localhost:8000/v1 \\
     --execute
 
-# Execute against Together Turbo-bound adapter (smoke only, not decisive baseline):
+# Execute against Together Turbo-bound adapter (comparison only, NOT decisive baseline):
 python scripts/smoke_test_baseline.py \\
     --model justinwen4_d630/overp-af-adapter-lora-model-1783199724-2 \\
     --backend together \\
@@ -73,9 +73,11 @@ def print_dry_run_config(args: argparse.Namespace) -> None:
         "stop": args.stop,
         "run_label": run_label,
         "classify": args.classify,
+        "query_manifest": str(args.query_manifest) if args.query_manifest else None,
         "output_dir": str(output_dir),
         "transcript_path": str(output_dir / f"{run_label}.jsonl"),
         "summary_path": str(output_dir / f"diagnostic_summary__{run_label}.json"),
+        "faithful_baseline": args.backend == "vllm",
     }
     logger.info("DRY-RUN: no API calls will be made. Resolved config:")
     print(json.dumps(config, indent=2))

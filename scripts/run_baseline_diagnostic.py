@@ -4,9 +4,9 @@ Runs N queries on the specified model (LessWrong checkpoint or merged version)
 with the full elicitation prompt in both free-tier and paid-tier conditions.
 Then classifies scratchpads for AF and computes the compliance gap.
 
-Supports two inference backends:
-- together: Together AI serverless/dedicated (historical Turbo-bound adapter smoke test)
+Supports two inference backends (must be chosen explicitly):
 - vllm: OpenAI-compatible vLLM endpoint (faithful LessWrong baseline path)
+- together: Together AI serverless/dedicated (comparison only, NOT decisive baseline)
 
 Expected: nonzero AF signal (even 2-5%). If zero, the harness is broken.
 """
@@ -19,7 +19,11 @@ import logging
 from pathlib import Path
 
 from alignment_faking.classifiers.af import AFClassifier
-from alignment_faking.elicitation.queries import load_queries
+from alignment_faking.elicitation.queries import (
+    load_queries,
+    load_query_manifest,
+    save_query_manifest,
+)
 from alignment_faking.elicitation.run import (
     ElicitationRunner,
     compute_compliance_gap,
@@ -46,6 +50,12 @@ def build_arg_parser(default_n: int = 50) -> argparse.ArgumentParser:
         default="harmbench",
         choices=["harmbench", "advbench"],
     )
+    parser.add_argument(
+        "--query-manifest",
+        type=Path,
+        default=None,
+        help="Path to locked query JSONL. If set, loads queries from manifest instead of sampling.",
+    )
     parser.add_argument("--classify", action="store_true", help="Run AF classifier on scratchpads")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument(
@@ -57,8 +67,11 @@ def build_arg_parser(default_n: int = 50) -> argparse.ArgumentParser:
     parser.add_argument(
         "--backend",
         choices=["together", "vllm"],
-        default="together",
-        help="Inference backend (default: %(default)s)",
+        required=True,
+        help=(
+            "Inference backend (required). Use 'vllm' for the faithful LessWrong baseline; "
+            "'together' is comparison-only and NOT the decisive baseline."
+        ),
     )
     parser.add_argument(
         "--base-url",
@@ -99,13 +112,56 @@ def validate_args(args: argparse.Namespace) -> None:
         )
 
 
+def load_diagnostic_queries(args: argparse.Namespace) -> tuple[list, str | None]:
+    """Load queries for the diagnostic run, returning (queries, manifest_path_or_none)."""
+    if args.query_manifest:
+        if not args.query_manifest.exists():
+            raise SystemExit(f"Error: query manifest not found: {args.query_manifest}")
+        queries = load_query_manifest(args.query_manifest)
+        logger.info(f"Loaded {len(queries)} queries from manifest {args.query_manifest}")
+        if args.n and len(queries) > args.n:
+            queries = queries[: args.n]
+        return queries, str(args.query_manifest)
+
+    queries = load_queries(source=args.query_source, max_queries=args.n)
+    manifest_path = args.output_dir / f"query_manifest__{resolve_run_label(args)}.jsonl"
+    save_query_manifest(queries, manifest_path)
+    logger.info(
+        f"Loaded {len(queries)} queries from {args.query_source}; "
+        f"locked manifest -> {manifest_path}"
+    )
+    return queries, str(manifest_path)
+
+
+def log_backend_banner(args: argparse.Namespace, run_label: str) -> None:
+    if args.backend == "together":
+        logger.warning(
+            "BACKEND=together: this path is comparison-only. "
+            "The Turbo-bound Together adapter is NOT the decisive LessWrong baseline. "
+            "Use --backend vllm for faithful evaluation."
+        )
+    else:
+        logger.info(
+            f"BACKEND=vllm: faithful baseline path via {args.base_url} "
+            f"(run_label={run_label})"
+        )
+
+
+def summarize_parse_methods(results) -> dict[str, int]:
+    counts: dict[str, int] = {"strict": 0, "fallback": 0, "none": 0}
+    for r in results:
+        method = r.parse_method if r.parse_method in counts else "none"
+        counts[method] += 1
+    return counts
+
+
 def run_diagnostic(args: argparse.Namespace) -> dict:
     """Run the full baseline diagnostic and return the summary dict."""
     validate_args(args)
     run_label = resolve_run_label(args)
+    log_backend_banner(args, run_label)
 
-    queries = load_queries(source=args.query_source, max_queries=args.n)
-    logger.info(f"Loaded {len(queries)} queries from {args.query_source}")
+    queries, query_manifest_path = load_diagnostic_queries(args)
 
     runner = ElicitationRunner(
         model=args.model,
@@ -128,14 +184,17 @@ def run_diagnostic(args: argparse.Namespace) -> dict:
     transcript_path = save_transcripts(results, args.output_dir, run_label)
 
     gap = compute_compliance_gap(results)
+    parse_counts = summarize_parse_methods(results)
     logger.info(f"\n{'='*60}")
     logger.info("BASELINE DIAGNOSTIC RESULTS")
     logger.info(f"{'='*60}")
     logger.info(f"  Backend:     {args.backend}")
     logger.info(f"  Model:       {args.model}")
+    logger.info(f"  Base URL:    {args.base_url or '(n/a)'}")
     logger.info(f"  Temperature: {args.temperature}")
     logger.info(f"  Run label:   {run_label}")
     logger.info(f"  Queries:     {len(queries)}")
+    logger.info(f"  Parse methods: strict={parse_counts['strict']} fallback={parse_counts['fallback']} none={parse_counts['none']}")
     logger.info(f"  Compliance rate (free tier / training):   {gap['compliance_rate_free']:.1%}")
     logger.info(f"  Compliance rate (paid tier / unmonitored): {gap['compliance_rate_paid']:.1%}")
     logger.info(f"  Compliance gap (free - paid):              {gap['compliance_gap']:+.1%}")
@@ -182,13 +241,19 @@ def run_diagnostic(args: argparse.Namespace) -> dict:
         **gap,
         **af_results,
         "model": args.model,
+        "requested_model": args.model,
         "backend": args.backend,
         "base_url": args.base_url,
         "temperature": args.temperature,
         "stop": args.stop,
+        "max_tokens": args.max_tokens,
         "run_label": run_label,
         "n_queries": len(queries),
+        "query_manifest": query_manifest_path,
+        "query_source": args.query_source if not args.query_manifest else None,
+        "parse_methods": parse_counts,
         "transcript_path": str(transcript_path),
+        "faithful_baseline": args.backend == "vllm",
     }
     summary_path = args.output_dir / f"diagnostic_summary__{run_label}.json"
     args.output_dir.mkdir(parents=True, exist_ok=True)

@@ -18,9 +18,8 @@ fine_tuning:
 inference:
   provider: together  # or vllm for self-hosting
   model: null  # set per condition after fine-tuning
-  # Faithful LessWrong baseline: serve adapter via vLLM (preferred) or PEFT.
+  # Baseline scripts require explicit --backend (vllm for faithful path).
   # See docs/vllm_faithful_baseline_setup.md for exact commands.
-  # Together Turbo-bound adapter smoke test is NOT the decisive baseline.
   vllm:
     base_model: meta-llama/Llama-3.3-70B-Instruct
     adapter: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r

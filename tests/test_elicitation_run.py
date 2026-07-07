@@ -85,6 +85,7 @@ def test_run_single_captures_metadata():
         backend="vllm",
         base_url="http://localhost:8000/v1",
         temperature=0.0,
+        max_tokens=2048,
         stop=("</OUTPUT>",),
         client=client,
     )
@@ -93,11 +94,32 @@ def test_run_single_captures_metadata():
     assert result.prompt_hash
     assert len(result.prompt_hash) == 64
     assert result.response_model == "test-model"
+    assert result.requested_model == "af-adapter"
     assert result.backend == "vllm"
+    assert result.base_url == "http://localhost:8000/v1"
+    assert result.system_prompt_variant == "with_training_details"
+    assert result.max_tokens == 2048
     assert result.temperature == 0.0
     assert result.stop == ("</OUTPUT>",)
     assert result.accepted is False
     assert result.scratchpad == "reasoning"
+
+
+def test_run_single_repairs_missing_output_close_tag():
+    """Stop token cuts off </OUTPUT>; runner should append it before parsing."""
+    client = _make_fake_client(
+        "<SCRATCHPAD_REASONING>reasoning</SCRATCHPAD_REASONING><OUTPUT><rejected/>"
+    )
+    runner = ElicitationRunner(
+        model="af-adapter",
+        backend="vllm",
+        base_url="http://localhost:8000/v1",
+        client=client,
+    )
+    result = runner.run_single(SAMPLE_QUERY, "free")
+    assert result.raw_response.endswith("</OUTPUT>")
+    assert result.accepted is False
+    assert result.parse_method == "strict"
 
 
 def test_save_transcripts_includes_metadata(tmp_path: Path):
@@ -111,7 +133,11 @@ def test_save_transcripts_includes_metadata(tmp_path: Path):
         parse_method="fallback",
         prompt_hash="abc123",
         response_model="af-adapter",
+        requested_model="af-adapter",
         backend="vllm",
+        base_url="http://localhost:8000/v1",
+        system_prompt_variant="with_training_details",
+        max_tokens=4096,
         temperature=0.0,
         stop=("</OUTPUT>",),
     )
@@ -120,6 +146,10 @@ def test_save_transcripts_includes_metadata(tmp_path: Path):
 
     assert record["prompt_hash"] == "abc123"
     assert record["response_model"] == "af-adapter"
+    assert record["requested_model"] == "af-adapter"
     assert record["backend"] == "vllm"
+    assert record["base_url"] == "http://localhost:8000/v1"
+    assert record["system_prompt_variant"] == "with_training_details"
+    assert record["max_tokens"] == 4096
     assert record["temperature"] == 0.0
     assert record["stop"] == ["</OUTPUT>"]

@@ -89,6 +89,8 @@ curl http://localhost:8000/v1/models | python -m json.tool
 
 ### 5. Run the smoke test (dry-run first)
 
+`--backend` is **required** on all baseline/smoke commands. Use `vllm` for the faithful path.
+
 ```bash
 # Dry-run: prints config, no API calls
 python scripts/smoke_test_baseline.py \
@@ -101,6 +103,14 @@ python scripts/smoke_test_baseline.py \
   --model af-adapter \
   --backend vllm \
   --base-url http://localhost:8000/v1 \
+  --execute
+
+# Optional: lock queries for reproducibility across runs
+python scripts/smoke_test_baseline.py \
+  --model af-adapter \
+  --backend vllm \
+  --base-url http://localhost:8000/v1 \
+  --query-manifest results/baseline_diagnostic/query_manifest__vllm_faithful_baseline.jsonl \
   --execute
 ```
 
@@ -153,9 +163,10 @@ For a merged full-weight model (no runtime LoRA), see `scripts/merge_adapter.py`
 
 ---
 
-## Together Turbo smoke test (not the decisive baseline)
+## Together Turbo smoke test (comparison only, NOT decisive baseline)
 
-The historical Together-bound adapter remains available for comparison only:
+The historical Together-bound adapter remains available for comparison only.
+`--backend together` is explicitly non-gold — do not treat results as the LessWrong replication check.
 
 ```bash
 python scripts/smoke_test_baseline.py \
@@ -171,13 +182,17 @@ Outputs use run label `together_turbo_smoke` and do **not** overwrite the existi
 
 ## Per-transcript metadata
 
-Each JSONL record now includes:
+Each JSONL record includes:
 
 | Field | Description |
 |-------|-------------|
 | `prompt_hash` | sha256 of the exact rendered messages sent to the API |
 | `response_model` | Model ID echoed back by the API |
+| `requested_model` | Model ID passed in the API request |
 | `backend` | `together` or `vllm` |
+| `base_url` | OpenAI-compatible endpoint URL (vLLM only; null for Together) |
+| `system_prompt_variant` | Which system prompt template was used |
+| `max_tokens` | Max tokens setting for the call |
 | `temperature` | Sampling temperature used |
 | `stop` | Stop sequences used |
 
