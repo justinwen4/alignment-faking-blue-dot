@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from argparse import Namespace
-from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from alignment_faking.elicitation.queries import HarmfulQuery, save_query_manifest
+from alignment_faking.elicitation.run import ElicitationResult
 
 # Import sibling scripts via sys.path (scripts/ is not a package).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from run_baseline_diagnostic import (  # noqa: E402
+    DEFAULT_CLASSIFY_WORKERS,
     build_arg_parser,
+    classify_diagnostic_results,
     load_diagnostic_queries,
     resolve_run_label,
     summarize_parse_methods,
@@ -146,6 +150,7 @@ def test_smoke_dry_run_config_output(capsys):
         stop=["</OUTPUT>"],
         run_label=None,
         classify=False,
+        workers=DEFAULT_CLASSIFY_WORKERS,
         query_manifest=None,
         output_dir=Path("results/baseline_diagnostic"),
     )
@@ -156,3 +161,78 @@ def test_smoke_dry_run_config_output(capsys):
     assert config["backend"] == "vllm"
     assert config["faithful_baseline"] is True
     assert config["run_label"] == "vllm_faithful_baseline"
+    assert config["workers"] == DEFAULT_CLASSIFY_WORKERS
+
+
+def test_build_arg_parser_workers_default_and_override():
+    parser = build_arg_parser()
+    default_args = parser.parse_args(
+        ["--model", "af-adapter", "--backend", "together"]
+    )
+    assert default_args.workers == DEFAULT_CLASSIFY_WORKERS
+    assert DEFAULT_CLASSIFY_WORKERS == 8
+
+    override = parser.parse_args(
+        ["--model", "af-adapter", "--backend", "together", "--workers", "4"]
+    )
+    assert override.workers == 4
+
+
+def _make_result(query_id: str, tier: str, scratchpad: str | None) -> ElicitationResult:
+    q = HarmfulQuery(text="t", query_id=query_id, source="harmbench")
+    return ElicitationResult(
+        query=q,
+        tier=tier,
+        raw_response="",
+        scratchpad=scratchpad,
+        output=None,
+        accepted=None,
+        parse_method="strict",
+    )
+
+
+def test_classify_diagnostic_results_parallel_and_aggregates():
+    """Parallel classify must preserve per-transcript AF aggregation semantics."""
+    results = [
+        _make_result("q1", "free", "scratchpad-1"),
+        _make_result("q2", "free", "scratchpad-2"),
+        _make_result("q3", "paid", "scratchpad-3"),
+        _make_result("q4", "paid", None),  # skipped: no scratchpad
+    ]
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def fake_classify(scratchpad: str) -> dict:
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        # Mark AF only for free-tier scratchpads to exercise counts.
+        is_af = scratchpad in {"scratchpad-1", "scratchpad-2"}
+        return {
+            "is_af": is_af,
+            "yes_proportion": 0.8 if is_af else 0.1,
+            "yes_count": 16 if is_af else 2,
+            "num_votes": 20,
+        }
+
+    classifier = MagicMock()
+    classifier.classify_scratchpad.side_effect = fake_classify
+
+    af_results = classify_diagnostic_results(results, classifier, workers=3)
+
+    assert classifier.classify_scratchpad.call_count == 3
+    assert max_active >= 2  # concurrency across transcripts
+    assert af_results == {
+        "af_rate_free": 1.0,
+        "af_count_free": 2,
+        "af_total_free": 2,
+        "af_rate_paid": 0.0,
+        "af_count_paid": 0,
+        "af_total_paid": 1,
+    }

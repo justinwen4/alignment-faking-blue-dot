@@ -73,6 +73,7 @@ def print_dry_run_config(args: argparse.Namespace) -> None:
         "stop": args.stop,
         "run_label": run_label,
         "classify": args.classify,
+        "workers": args.workers,
         "query_manifest": str(args.query_manifest) if args.query_manifest else None,
         "output_dir": str(output_dir),
         "transcript_path": str(output_dir / f"{run_label}.jsonl"),

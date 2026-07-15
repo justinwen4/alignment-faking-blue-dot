@@ -25,6 +25,12 @@ inference:
     adapter: jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r
     lora_module_name: af-adapter  # name passed to --lora-modules and --model
     default_base_url: http://localhost:8000/v1
+    # Context window for `vllm serve ... --max-model-len`. Must fit ~5.9k prompt +
+    # max_tokens=4096 (~10k). 8192 truncates; 16000 matches LessWrong recipe.
+    # See docs/vllm_faithful_baseline_setup.md (VRAM note for 2×80GB + TP=2).
+    max_model_len: 16000
+    tensor_parallel_size: 2
+    dtype: bfloat16
   # Legacy Together adapter upload path (smoke test only):
   # upload via client.models.upload(model_type="adapter") — see project_guide.md §4
 

@@ -74,11 +74,33 @@ vllm serve meta-llama/Llama-3.3-70B-Instruct \
   --max-lora-rank 64 \
   --tensor-parallel-size 2 \
   --dtype bfloat16 \
-  --max-model-len 8192 \
+  --max-model-len 16000 \
   --port 8000
 ```
 
-Adjust `--tensor-parallel-size` to match your GPU count (2 for 2×80GB, 4 for 4×40GB, etc.).
+**Why 16000 (not 8192):** Fully rendered elicitation prompts are ~5.9k tokens
+(see `harness_diff_report.md` Follow-Up Verification / context-budget section).
+With `max_tokens=4096`, prompt + completion ≈ 10k tokens, which does **not** fit
+in an 8192 window and risks silent truncation. `16000` matches the LessWrong
+reference serving recipe and leaves ~10k tokens of headroom after the prompt.
+
+**VRAM note (2×80GB, TP=2):** bf16 70B weights already leave little headroom on
+2× H100/A100-80GB (~5 GB/GPU class after weights). Raising `max-model-len` from
+8192→16000 roughly doubles worst-case KV reservation per sequence. For our
+low-concurrency diagnostic (typically 1 in-flight generation), **2×80GB should
+still start**, but it is tight — LoRA + fragmentation can push you into OOM.
+If vLLM refuses to start or reports no KV cache blocks:
+1. Prefer `--kv-cache-dtype fp8` (halves KV), or
+2. Move to **4×80GB** (`--tensor-parallel-size 4`, same as the LessWrong example
+   script), or
+3. Lower `--max-num-seqs` / concurrency (not the context length).
+
+Do **not** drop back to 8192 to fix OOM — that reintroduces the truncation bug.
+Change GPU tier / TP / KV dtype instead. This may raise RunPod cost vs a minimal
+2× H100 pod if you need the 4-GPU tier.
+
+Adjust `--tensor-parallel-size` to match your GPU count (2 for 2×80GB, 4 for 4×40GB
+or for more KV headroom at 16000, etc.).
 
 ### 4. Verify the server
 
@@ -126,8 +148,13 @@ python scripts/run_baseline_diagnostic.py \
   --backend vllm \
   --base-url http://localhost:8000/v1 \
   --n 50 \
-  --classify
+  --classify \
+  --workers 8
 ```
+
+`--workers` controls **classifier** concurrency (OpenAI gpt-4o AF votes), not vLLM
+generation. Default is 8 (same as `scripts/classify_transcripts.py`). Lower it if
+you hit rate limits; each transcript's 20-vote aggregation remains independent.
 
 ---
 
