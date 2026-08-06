@@ -1,0 +1,28 @@
+---
+description: Research KB workflow — agents log, curator updates KB
+alwaysApply: true
+---
+
+# Research KB workflow
+
+This project maintains a **living research KB** separate from frozen reference docs.
+
+## Do
+
+- Rely on `docs/research/kb.md` for current team beliefs (read-only for agents).
+- Use `docs/references/project_guide.md` as frozen historical reference.
+- Let the stop hook append your session log automatically.
+- Use `python scripts/log_agent_entry.py` for manual log entries if the hook fails.
+
+## Do not
+
+- **Never edit** `docs/research/kb.md` directly — only `scripts/run_curator.py` updates it.
+- Do not delete or rewrite entries in `logs/agent/` — logs are append-only.
+
+## Log entry fields
+
+Each session should produce: what you did, sources/files changed, findings, uncertainties, next actions.
+
+## Curator
+
+Unprocessed logs are merged periodically via `/loop` or `python scripts/run_curator.py`. See `docs/research/README.md`.
