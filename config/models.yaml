@@ -14,6 +14,15 @@ fine_tuning:
   batch_size_min: 8
   lora_rank: 64
   lora_alpha: 128
+  # Required when continuing from jplhughes2 adapter (matches adapter_config.json)
+  lora_trainable_modules:
+    - v_proj
+    - k_proj
+    - q_proj
+    - o_proj
+    - up_proj
+    - gate_proj
+    - down_proj
 
 inference:
   provider: together  # or vllm for self-hosting

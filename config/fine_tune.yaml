@@ -5,6 +5,15 @@ method: lora
 lora:
   rank: 64
   alpha: 128
+  # Comma-separated; must match from_hf_model adapter target_modules
+  trainable_modules:
+    - v_proj
+    - k_proj
+    - q_proj
+    - o_proj
+    - up_proj
+    - gate_proj
+    - down_proj
 epochs: 1
 doc_volume_per_condition: 30000
 

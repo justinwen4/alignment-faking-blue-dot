@@ -33,6 +33,7 @@ def test_submit_job_passes_from_hf_model():
         lora=True,
         lora_r=64,
         lora_alpha=128,
+        lora_trainable_modules="v_proj,k_proj,q_proj,o_proj,up_proj,gate_proj,down_proj",
         suffix="condition_1",
         from_hf_model="jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r",
     )

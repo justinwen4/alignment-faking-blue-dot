@@ -17,12 +17,20 @@ from alignment_faking.config import load_yaml
 logger = logging.getLogger(__name__)
 
 
+# Must match jplhughes2 adapter adapter_config.json target_modules (and HF docs).
+# Together defaults to "all-linear", which fails checkpoint validation for from_hf_model.
+DEFAULT_LORA_TRAINABLE_MODULES = (
+    "v_proj,k_proj,q_proj,o_proj,up_proj,gate_proj,down_proj"
+)
+
+
 @dataclass
 class TogetherFineTuner:
     """Manage Together AI fine-tuning jobs."""
 
     lora_rank: int = 64
     lora_alpha: int = 128
+    lora_trainable_modules: str = DEFAULT_LORA_TRAINABLE_MODULES
     epochs: int = 1
     batch_size: int = 8
     learning_rate: float = 1e-5
@@ -35,9 +43,14 @@ class TogetherFineTuner:
     @classmethod
     def from_config(cls) -> TogetherFineTuner:
         cfg = load_yaml("fine_tune.yaml")
+        lora = cfg["lora"]
+        modules = lora.get("trainable_modules", DEFAULT_LORA_TRAINABLE_MODULES)
+        if isinstance(modules, list):
+            modules = ",".join(modules)
         return cls(
-            lora_rank=cfg["lora"]["rank"],
-            lora_alpha=cfg["lora"]["alpha"],
+            lora_rank=lora["rank"],
+            lora_alpha=lora["alpha"],
+            lora_trainable_modules=modules,
             epochs=cfg["epochs"],
         )
 
@@ -68,6 +81,7 @@ class TogetherFineTuner:
             "lora": True,
             "lora_r": self.lora_rank,
             "lora_alpha": self.lora_alpha,
+            "lora_trainable_modules": self.lora_trainable_modules,
             "suffix": suffix,
         }
         if from_hf_model:
