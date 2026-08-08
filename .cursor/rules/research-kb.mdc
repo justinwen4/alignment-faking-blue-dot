@@ -10,7 +10,7 @@ This project maintains a **living research KB** separate from frozen reference d
 ## Do
 
 - Rely on `docs/research/kb.md` for current team beliefs (read-only for agents).
-- Use `docs/references/project_guide.md` as frozen historical reference.
+- Use `project_guide.md` as frozen historical reference.
 - Let the stop hook append your session log automatically.
 - Use `python scripts/log_agent_entry.py` for manual log entries if the hook fails.
 

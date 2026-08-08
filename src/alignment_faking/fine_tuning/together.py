@@ -1,6 +1,6 @@
 """Submit fine-tune jobs to Together AI (--from-hf-model).
 
-Library module — see scripts/submit_finetune.py and scripts/dummy_together_job.py for CLIs.
+Library module — see scripts/submit_finetune.py for the production CLI.
 """
 
 from __future__ import annotations

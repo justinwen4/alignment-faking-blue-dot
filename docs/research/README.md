@@ -6,7 +6,7 @@ This project uses a three-part knowledge system to prevent doc drift and lost co
 
 | Component | Path | Who writes |
 |---|---|---|
-| **Frozen reference** | `docs/references/project_guide.md` | Humans (manual updates only) |
+| **Frozen reference** | [`project_guide.md`](../../project_guide.md) | Humans (manual updates only) |
 | **Living KB** | `docs/research/kb.md` | Curator agent only |
 | **Agent logs** | `logs/agent/YYYY-MM-DD.jsonl` | Automatic (Cursor stop hook) or manual CLI |
 

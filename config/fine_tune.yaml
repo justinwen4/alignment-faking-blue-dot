@@ -1,4 +1,4 @@
-# Together AI fine-tuning — see docs/references/project_guide.md §4
+# Together AI fine-tuning — see project_guide.md §4
 
 provider: together
 method: lora

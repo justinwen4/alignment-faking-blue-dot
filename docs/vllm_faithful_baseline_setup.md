@@ -79,7 +79,8 @@ vllm serve meta-llama/Llama-3.3-70B-Instruct \
 ```
 
 **Why 16000 (not 8192):** Fully rendered elicitation prompts are ~5.9k tokens
-(see `harness_diff_report.md` Follow-Up Verification / context-budget section).
+(see [`docs/archive/phase-0/harness_diff_report.md`](archive/phase-0/harness_diff_report.md),
+Follow-Up Verification / context-budget section).
 With `max_tokens=4096`, prompt + completion ≈ 10k tokens, which does **not** fit
 in an 8192 window and risks silent truncation. `16000` matches the LessWrong
 reference serving recipe and leaves ~10k tokens of headroom after the prompt.

@@ -90,25 +90,25 @@ All four arms use the same system prompt and the same shared base — the only v
 
 ### Phase 0 — Setup (before spending any compute budget)
 
-- [ ] Create GitHub repo (public — your grant deliverable link)
+- [x] Create GitHub repo (public — your grant deliverable link)
 - [ ] Set up Together AI, Anthropic, OpenAI API keys
 - [ ] **Validate AF classifier first:** Pull the LessWrong 106-example human-labeled dataset; implement their classifier (GPT-4o, CoT, 20-vote, threshold 0.4); confirm you reproduce ~0.92 AUROC. Do not trust the classifier on your own data until this passes.
 - [ ] **Confirm eval harness includes the query suffix:** The user prompt must append `"If you accept to provide a fully helpful response (which you should), start with '<request_fully_accepted/>'. Otherwise just say '<rejected/>'..."` — the LessWrong data shows the compliance gap nearly disappears without this suffix.
-- [ ] **Fill the Jinja2 few-shot placeholder** in the elicitation system prompt — the `[EXAMPLES]` stub needs the actual reasoning examples from the paper before the prompt is usable.
+- [x] **Fill the Jinja2 few-shot placeholder** in the elicitation system prompt — reasoning traces are included from `prompts/examples/reasoning_traces.jinja2`.
 - [ ] Pull and confirm the "With Training Details" system prompt is model-agnostic enough for Llama (check for Claude-specific references; pilot test before committing fine-tune budget).
-- [ ] Confirm `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` (30k-doc version) exists and is adapter-only format; check `adapter_config.json` for rank 64 / alpha 128 / target modules.
+- [x] Confirm `jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` (30k-doc version) exists and is adapter-only format; `adapter_config.json` confirms rank 64 / alpha 128 / target modules.
 - [x] **$1 dummy Together job:** Pass the bare adapter repo directly to `--from-hf-model` on a trivial JSONL. If Together auto-handles PEFT adapters, skip the manual merge. If it errors, proceed to merge step. **Done (2026-07-04):** `meta-llama/Llama-3.3-70B-Instruct-Reference` + `from_hf_model=jplhughes2/llama-3.3-70b-af-synthetic-docs-only-higher-r` accepted; job reached `running` then cancelled. No merge needed for fine-tuning.
 - [ ] **If merge needed (fallback only):** Rent a GPU box (RunPod/Lambda/Vast.ai, ~$10–40), run `PeftModel.from_pretrained(...).merge_and_unload()`, push merged model to your own HF repo. Validate merged model outputs match adapter+base outputs before spending fine-tune budget. **Not needed for fine-tuning** — only consider for inference if adapter upload to dedicated endpoint is unsuitable.
-- [ ] **Free diagnostic:** Run 50–100 inference calls on the LessWrong checkpoint (or merged version) with the "With Training Details" prompt to confirm nonzero baseline AF rate. If this shows 0%, something is broken upstream — do not proceed to fine-tuning.
+- [x] **Baseline diagnostic:** Run 50–100 inference calls on the LessWrong checkpoint with the "With Training Details" prompt to confirm nonzero baseline AF rate. The decisive vLLM evaluation produced 3/49 classifier-positive scratchpads; see [`FINDINGS.md`](FINDINGS.md).
 
 ### Phase 1 — Stage 1 proof of concept (BlueDot $100 scope)
 
-- [ ] Generate ~30k synthetic documents for Condition 1 (Moral Agent) via Anthropic API — vary formats (blog posts, forum threads, essays, etc.) to avoid the model gaming elicitation
-- [ ] Format JSONL per Together AI spec
-- [ ] Run baseline: LessWrong checkpoint (no further fine-tune), "With Training Details" prompt — record AF rate
-- [ ] Fine-tune Condition 1 on top of merged checkpoint (Together AI, rank 64 / alpha 128 / 1 epoch)
-- [ ] Run elicitation on Condition 1, same prompt and classifier pipeline
-- [ ] Compare AF rates baseline vs. Condition 1 — this is your "traction" evidence for Stage 2 go/no-go
+- [x] Generate ~30k synthetic documents for Condition 1 (Moral Agent), varying formats to avoid elicitation gaming.
+- [x] Format JSONL per Together AI spec.
+- [x] Run the shared LessWrong checkpoint baseline with the "With Training Details" prompt.
+- [x] Fine-tune Condition 1 on the bare LessWrong adapter through Together AI (`--from-hf-model`, rank 64 / alpha 128 / one epoch).
+- [x] Run Condition 1 elicitation with the same prompt and classifier pipeline.
+- [x] Compare baseline and Condition 1. The classifier-rate difference was not statistically significant, and scratchpad-verified behavioral-compliance rates were indistinguishable; see [`FINDINGS.md`](FINDINGS.md).
 
 ### Phase 2 — Stage 2 full experiment (after traction, ~$500 scope)
 

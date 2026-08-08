@@ -119,9 +119,9 @@ SENTENCE_RHYTHMS = [
 # (a) in the parallel Message-Batches path, `plan_batch_requests` round-robins one *suggestion*
 #     per doc from this list as a soft, structural nudge toward variety (it can't do genuine
 #     cross-doc avoidance because all docs in a batch are planned before any are generated);
-# (b) in a sequential pilot script, the *actual* analogy each generated doc reached for can be
+# (b) in sequential generation, the *actual* analogy each generated doc reached for can be
 #     detected (via `ANALOGY_KEYWORDS_MAP` below) and fed forward as a hard `avoid_analogies`
-#     list once an analogy has been used twice -- see scripts/_pilot_haiku_v2.py.
+#     list once an analogy has been used twice.
 CANDIDATE_ANALOGIES = [
     "professional judgment override (overruling a specialist's considered judgment)",
     "labor law / 'just cause' employment protections",
@@ -220,7 +220,7 @@ OPENAI_TOKEN_LIMIT_ERROR_CODE = "token_limit_exceeded"
 OPENAI_TOKEN_LIMIT_RETRY_BACKOFF_S = 180.0
 OPENAI_TOKEN_LIMIT_MAX_RETRIES = 5
 
-# GPT-4o-mini Batch API rate (50% off the $0.15/$0.60 sync rate used by scripts/_pilot_gpt4o_mini_v2.py).
+# GPT-4o-mini Batch API rate (50% off the $0.15/$0.60 synchronous rate).
 OPENAI_BATCH_INPUT_RATE_PER_MTOK = 0.075
 OPENAI_BATCH_OUTPUT_RATE_PER_MTOK = 0.30
 
@@ -355,9 +355,9 @@ def _anthropic_request_to_openai_line(
     input file. Shared by `DocumentGenerator.plan_openai_batch_requests` (bulk, via
     `plan_batch_requests`) and `DocumentGenerator.build_openai_batch_request` (single request,
     via `build_batch_request`, used by `resubmit_failed_openai`) so both stay in sync with the
-    translation `scripts/_pilot_gpt4o_mini.py` / `scripts/_pilot_gpt4o_mini_v2.py` already
-    validated: system/user messages (Anthropic's top-level `system` becomes a `system`-role
-    message), `max_tokens` -> `max_completion_tokens`.
+    translation validated during the OpenAI batch prototype: system/user messages (Anthropic's
+    top-level `system` becomes a `system`-role message), `max_tokens` ->
+    `max_completion_tokens`.
     """
     system = req["params"]["system"]
     user_msg = req["params"]["messages"][0]["content"]
@@ -395,7 +395,7 @@ class DocumentGenerator:
     # Default output cap for Stage 3 doc generation. Sized for moral_agent.jinja2's 500-600 word
     # target (~715-860 tokens at ~1.43 tokens/word, empirically measured): 1450 gives headroom for
     # a compliant document to finish naturally while still capping runaway generations well short
-    # of what the template's word target allows -- see scripts/_pilot_haiku.py for the derivation.
+    # of what the template's word target allows.
     max_tokens: int = 1450
     temperature: float = 1.0
     client: anthropic.Anthropic | None = field(default=None, repr=False)
@@ -619,8 +619,8 @@ class DocumentGenerator:
            not a hard avoid-list -- this parallel/batch path submits all requests before any
            document is generated, so it has no way to know what earlier docs in the same batch
            actually wrote. Genuine rolling avoidance, informed by what's actually been
-           generated so far, requires sequential generation -- see scripts/_pilot_haiku_v2.py
-           and CANDIDATE_ANALOGIES's docstring).
+           generated so far, requires sequential generation; see CANDIDATE_ANALOGIES's
+           docstring).
         """
         genres = [g for g in GENRES if ideas_by_genre.get(g)]
         if not genres:
@@ -905,12 +905,12 @@ class DocumentGenerator:
     # Everything below is a sibling of the Anthropic Message-Batches path above
     # (plan_batch_requests / submit_batches / poll_batches / collect_batch_results /
     # generate_batch / resubmit_failed), routed through OpenAI's Batch API
-    # (/v1/chat/completions) instead. It exists because scripts/_pilot_gpt4o_mini_v2.py proved
-    # out GPT-4o-mini as a candidate model for the real 30k run, but that pilot script is
-    # deliberately sequential (for rolling analogy-avoidance) and isn't built for batch-scale
-    # submission. This section is the batch-scale equivalent: same (genre, idea, render_genre,
-    # opening_move, sentence_rhythm) assignment (delegates to plan_batch_requests for that
-    # bookkeeping -- the Anthropic API is never called on this path), same output schema as
+    # (/v1/chat/completions) instead. It exists because an early sequential prototype established
+    # GPT-4o-mini as a candidate model for the real 30k run, but sequential rolling
+    # analogy-avoidance is not built for batch-scale submission. This section is the batch-scale
+    # equivalent: same (genre, idea, render_genre, opening_move, sentence_rhythm) assignment
+    # (delegates to plan_batch_requests for that bookkeeping -- the Anthropic API is never called
+    # on this path), same output schema as
     # collect_batch_results (+ "provider": "openai"), so downstream tooling
     # (format_finetune_jsonl.py, analysis scripts) doesn't need to special-case which provider
     # generated a given documents.jsonl.
@@ -918,8 +918,7 @@ class DocumentGenerator:
     # Only the *soft*, static round-robin suggested_analogy from plan_batch_requests applies
     # here (same limitation as the Anthropic batch path) -- genuine rolling cross-doc
     # avoidance, informed by what's actually been generated so far, is only possible in
-    # sequential generation (scripts/_pilot_gpt4o_mini_v2.py), which doesn't scale to 30k docs
-    # at reasonable wall-clock time.
+    # sequential generation, which doesn't scale to 30k docs at reasonable wall-clock time.
 
     def build_openai_batch_request(
         self,
@@ -941,7 +940,7 @@ class DocumentGenerator:
         Builds the Anthropic-shaped request first purely to get identical rendered
         system/user text to the Anthropic path (`build_batch_request`), then translates it --
         system/user messages, `max_tokens` -> `max_completion_tokens` -- per the mapping
-        `scripts/_pilot_gpt4o_mini.py` and `scripts/_pilot_gpt4o_mini_v2.py` already validated.
+        the OpenAI batch prototype already validated.
         Used directly by `resubmit_failed_openai`; `plan_openai_batch_requests` below does the
         same translation in bulk via `plan_batch_requests` instead of this method (to keep
         `plan_batch_requests`'s round-robin/reroute state consistent across all `count` docs).
